@@ -66,7 +66,7 @@ class OrderItem extends \SilverShop\Model\Product\OrderItem
         return false;
     }
 
-    public function Image(): Image
+    public function Image(): Image|null
     {
         if (($variation = $this->ProductVariation()) && $variation->Image()->exists()) {
             return $variation->Image();
