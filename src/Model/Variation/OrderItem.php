@@ -60,7 +60,7 @@ class OrderItem extends \SilverShop\Model\Product\OrderItem
 
     public function SubTitle(): false|string
     {
-        if ($this->ProductVariation()) {
+        if ($this->ProductVariation() && $this->ProductVariation()->getTitle()) {
             return $this->ProductVariation()->getTitle();
         }
         return false;
