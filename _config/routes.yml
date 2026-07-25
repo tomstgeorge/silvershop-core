@@ -6,3 +6,4 @@ SilverStripe\Control\Director:
   rules:
     shoppingcart: SilverShop\Cart\ShoppingCartController
     dev/shop: SilverShop\Dev\ShopDevelopmentAdmin
+    shop-webhook: SilverShop\Payment\WebhookController

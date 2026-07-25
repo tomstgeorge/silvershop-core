@@ -11,13 +11,14 @@ use SilverShop\Currency\CurrencyService;
 use SilverShop\Extension\OrderManipulationExtension;
 use SilverShop\Extension\ShopConfigExtension;
 use SilverShop\Model\Order;
+use SilverShop\Payment\GatewayRegistry;
+use SilverShop\Payment\PaymentResult;
 use SilverShop\ShopTools;
 use SilverStripe\Control\Controller;
 use SilverStripe\Core\Config\Configurable;
 use SilverStripe\Core\Injector\Injectable;
 use SilverStripe\Core\Injector\Injector;
 use SilverStripe\Omnipay\Exception\InvalidConfigurationException;
-use SilverStripe\Omnipay\GatewayInfo;
 use SilverStripe\Omnipay\Model\Payment;
 use SilverStripe\Omnipay\Service\ServiceFactory;
 use SilverStripe\Omnipay\Service\ServiceResponse;
@@ -179,7 +180,9 @@ class OrderProcessor
      */
     public function createPayment($gateway): bool|Payment
     {
-        if (!GatewayInfo::isSupported($gateway)) {
+        $registry = GatewayRegistry::singleton();
+
+        if (!$registry->isSupported($gateway)) {
             $this->error(
                 _t(
                     __CLASS__ . ".InvalidGateway",
@@ -203,6 +206,25 @@ class OrderProcessor
         );
         $this->order->Payments()->add($payment);
         return $payment;
+    }
+
+    /**
+     * Record a successful payment from a modern (non-Omnipay) gateway.
+     * Creates a Payment record marked as Captured and triggers the standard completion flow.
+     */
+    public function recordModernPayment(string $gateway, PaymentResult $result): void
+    {
+        $payment = Payment::create()->init(
+            $gateway,
+            $this->order->TotalOutstanding(true),
+            ShopConfigExtension::config()->base_currency
+        );
+        $payment->Status = 'Captured';
+        $payment->TransactionReference = $result->getTransactionId();
+        $this->order->Payments()->add($payment);
+        $payment->write();
+
+        $this->completePayment();
     }
 
     /**

@@ -12,7 +12,7 @@ use SilverShop\Checkout\Component\Payment;
 use SilverShop\Checkout\Component\ShippingAddress;
 use SilverShop\Checkout\Component\Terms;
 use SilverShop\Model\Order;
-use SilverStripe\Omnipay\GatewayInfo;
+use SilverShop\Payment\GatewayRegistry;
 use SilverStripe\Security\Security;
 
 class SinglePageCheckoutComponentConfig extends CheckoutComponentConfig
@@ -27,7 +27,7 @@ class SinglePageCheckoutComponentConfig extends CheckoutComponentConfig
             $this->addComponent(Membership::create());
         }
 
-        if (count(GatewayInfo::getSupportedGateways()) > 1) {
+        if (count(GatewayRegistry::singleton()->getAvailableGateways()) > 1) {
             $this->addComponent(Payment::create());
         }
 

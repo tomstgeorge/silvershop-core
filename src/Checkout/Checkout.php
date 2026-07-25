@@ -7,11 +7,11 @@ namespace SilverShop\Checkout;
 use SilverShop\Cart\ShoppingCart;
 use SilverShop\Model\Address;
 use SilverShop\Model\Order;
+use SilverShop\Payment\GatewayRegistry;
 use SilverShop\ShopTools;
 use SilverShop\ShopUserInfo;
 use SilverStripe\Core\Injector\Injectable;
 use SilverStripe\Omnipay\Exception\InvalidConfigurationException;
-use SilverStripe\Omnipay\GatewayInfo;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\Security;
 
@@ -128,7 +128,7 @@ class Checkout
      */
     public function setPaymentMethod($paymentmethod): bool
     {
-        $methods = GatewayInfo::getSupportedGateways();
+        $methods = GatewayRegistry::singleton()->getAvailableGateways();
         if (!isset($methods[$paymentmethod])) {
             ShopTools::getSession()
                 ->set('Checkout.PaymentMethod', null)
@@ -148,7 +148,7 @@ class Checkout
      */
     public function getSelectedPaymentMethod($nice = false): string|array|null
     {
-        $methods = GatewayInfo::getSupportedGateways();
+        $methods = GatewayRegistry::singleton()->getAvailableGateways();
         reset($methods);
         $method = count($methods) === 1 ? key($methods) : ShopTools::getSession()->get('Checkout.PaymentMethod');
         if ($nice && isset($methods[$method])) {

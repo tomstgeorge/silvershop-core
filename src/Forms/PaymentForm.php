@@ -9,10 +9,10 @@ use SilverShop\Checkout\CheckoutComponentConfig;
 use SilverShop\Checkout\Component\CheckoutComponentNamespaced;
 use SilverShop\Checkout\OrderProcessor;
 use SilverShop\Model\Order;
+use SilverShop\Payment\GatewayRegistry;
 use SilverStripe\Control\HTTPResponse;
 use SilverStripe\Control\RequestHandler;
 use SilverStripe\Omnipay\GatewayFieldsFactory;
-use SilverStripe\Omnipay\GatewayInfo;
 
 class PaymentForm extends CheckoutForm
 {
@@ -66,8 +66,11 @@ class PaymentForm extends CheckoutForm
         $this->config->setData($form->getData());
         $order = $this->config->getOrder();
         $gateway = Checkout::get($order)->getSelectedPaymentMethod(false);
-        if (GatewayInfo::isOffsite($gateway)
-            || GatewayInfo::isManual($gateway)
+        $registry = GatewayRegistry::singleton();
+
+        if ($registry->isModernGateway($gateway)
+            || $registry->isOffsite($gateway)
+            || $registry->isManual($gateway)
             || $this->config->hasComponentWithPaymentData()
         ) {
             return $this->submitpayment($data, $form);
@@ -131,6 +134,27 @@ class PaymentForm extends CheckoutForm
         }
 
         $gateway = Checkout::get($order)->getSelectedPaymentMethod(false);
+
+        // Modern (non-Omnipay) gateway path
+        $registry = GatewayRegistry::singleton();
+        if ($registry->isModernGateway($gateway)) {
+            $modernGateway = $registry->getGateway($gateway);
+            $result = $modernGateway->processPayment($data, $order);
+
+            if ($result->getRedirectUrl()) {
+                return $this->controller->redirect($result->getRedirectUrl());
+            }
+
+            if ($result->isSuccess()) {
+                $this->orderProcessor->recordModernPayment($gateway, $result);
+                return $this->controller->redirect($this->getSuccessLink());
+            }
+
+            $form->sessionMessage($result->getErrorMessage(), 'bad');
+            return $this->controller->redirectBack();
+        }
+
+        // Legacy Omnipay gateway path
         $gatewayFieldsFactory = GatewayFieldsFactory::create($gateway);
 
         // This is where the payment is actually attempted

@@ -10,6 +10,7 @@ use SilverShop\Checkout\OrderEmailNotifier;
 use SilverShop\Checkout\OrderProcessor;
 use SilverShop\Extension\ShopConfigExtension;
 use SilverShop\Model\Order;
+use SilverShop\Payment\GatewayRegistry;
 use SilverStripe\Control\HTTPResponse;
 use SilverStripe\Core\Config\Config;
 use SilverStripe\Forms\CompositeField;
@@ -64,10 +65,11 @@ class OrderActionsForm extends Form
         $actions = FieldList::create();
         //payment
         if (self::config()->allow_paying && $order->canPay()) {
-            $gateways = GatewayInfo::getSupportedGateways();
+            $registry = GatewayRegistry::singleton();
+            $gateways = $registry->getAvailableGateways();
             //remove manual gateways
             foreach ($gateways as $gateway => $gatewayname) {
-                if (GatewayInfo::isManual($gateway)) {
+                if ($registry->isManual($gateway)) {
                     unset($gateways[$gateway]);
                 }
             }
@@ -157,6 +159,28 @@ class OrderActionsForm extends Form
             $data = $form->getData();
             $gateway = (empty($data['PaymentMethod'])) ? null : $data['PaymentMethod'];
 
+            $registry = GatewayRegistry::singleton();
+
+            // Modern (non-Omnipay) gateway path
+            if ($gateway && $registry->isModernGateway($gateway)) {
+                $modernGateway = $registry->getGateway($gateway);
+                $processor = OrderProcessor::create($this->order);
+                $result = $modernGateway->processPayment($data, $this->order);
+
+                if ($result->getRedirectUrl()) {
+                    return $this->controller->redirect($result->getRedirectUrl());
+                }
+
+                if ($result->isSuccess()) {
+                    $processor->recordModernPayment($gateway, $result);
+                    return $this->controller->redirect($processor->getReturnUrl());
+                }
+
+                $form->sessionMessage($result->getErrorMessage(), 'bad');
+                return $this->controller->redirectBack();
+            }
+
+            // Legacy Omnipay gateway path
             if (!GatewayInfo::isManual($gateway)) {
                 $processor = OrderProcessor::create($this->order);
                 $fieldFactory = GatewayFieldsFactory::create(null);
@@ -224,10 +248,15 @@ class OrderActionsForm extends Form
      */
     protected function getCCFields(array $gateways): ?CompositeField
     {
+        $registry = GatewayRegistry::singleton();
         $gatewayFieldsFactory = GatewayFieldsFactory::create(null, ['Card']);
         $onsiteGateways = [];
         $allRequired = [];
         foreach (array_keys($gateways) as $gateway) {
+            // Modern gateways provide their own UI, skip CC fields for them
+            if ($registry->isModernGateway($gateway)) {
+                continue;
+            }
             if (!GatewayInfo::isOffsite($gateway)) {
                 $required = GatewayInfo::requiredFields($gateway);
                 $onsiteGateways[$gateway] = $gatewayFieldsFactory->getFieldName($required);

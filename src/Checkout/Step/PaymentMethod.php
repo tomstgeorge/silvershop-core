@@ -9,10 +9,10 @@ use SilverShop\Checkout\Checkout;
 use SilverShop\Checkout\CheckoutComponentConfig;
 use SilverShop\Checkout\Component\Payment;
 use SilverShop\Forms\CheckoutForm;
+use SilverShop\Payment\GatewayRegistry;
 use SilverStripe\Control\HTTPResponse;
 use SilverStripe\Forms\FieldList;
 use SilverStripe\Forms\FormAction;
-use SilverStripe\Omnipay\GatewayInfo;
 
 class PaymentMethod extends CheckoutStep
 {
@@ -31,7 +31,7 @@ class PaymentMethod extends CheckoutStep
 
     public function paymentmethod(): HTTPResponse|array
     {
-        $gateways = GatewayInfo::getSupportedGateways();
+        $gateways = GatewayRegistry::singleton()->getAvailableGateways();
         if (count($gateways) === 1) {
             return $this->getOwner()->redirect($this->NextStepLink());
         }

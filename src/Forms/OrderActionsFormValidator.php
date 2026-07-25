@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SilverShop\Forms;
 
+use SilverShop\Payment\GatewayRegistry;
 use SilverStripe\Forms\Validation\RequiredFieldsValidator;
 use SilverStripe\Omnipay\GatewayFieldsFactory;
 use SilverStripe\Omnipay\GatewayInfo;
@@ -20,6 +21,13 @@ class OrderActionsFormValidator extends RequiredFieldsValidator
         // Check if we should do a payment
         if (!empty($data['PaymentMethod'])) {
             $gateway = $data['PaymentMethod'];
+            $registry = GatewayRegistry::singleton();
+
+            // Modern gateways handle their own validation — skip CC field requirements
+            if ($registry->isModernGateway($gateway)) {
+                return parent::php($data);
+            }
+
             // If the gateway isn't manual and not offsite, Check for credit-card fields!
             if (!GatewayInfo::isManual($gateway) && !GatewayInfo::isOffsite($gateway)) {
                 $fieldFactory = GatewayFieldsFactory::create(null);

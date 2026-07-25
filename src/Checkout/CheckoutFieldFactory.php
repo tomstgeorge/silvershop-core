@@ -7,6 +7,7 @@ namespace SilverShop\Checkout;
 use SilverStripe\Forms\FormField;
 use SilverShop\Model\Address;
 use SilverShop\Page\CheckoutPage;
+use SilverShop\Payment\GatewayRegistry;
 use SilverStripe\Forms\CheckboxField;
 use SilverStripe\Forms\ConfirmedPasswordField;
 use SilverStripe\Forms\EmailField;
@@ -17,7 +18,6 @@ use SilverStripe\Forms\OptionsetField;
 use SilverStripe\Forms\PasswordField;
 use SilverStripe\Forms\TextareaField;
 use SilverStripe\Forms\TextField;
-use SilverStripe\Omnipay\GatewayInfo;
 use SilverStripe\Security\Member;
 use SilverStripe\SiteConfig\SiteConfig;
 
@@ -109,12 +109,12 @@ class CheckoutFieldFactory
 
     public function getPaymentMethodFields(): OptionsetField
     {
-        //TODO: only get one field if there is no option
+        $gateways = GatewayRegistry::singleton()->getAvailableGateways();
         return OptionsetField::create(
             'PaymentMethod',
             _t('SilverShop\Checkout\CheckoutField.PaymentType', "Payment Type"),
-            GatewayInfo::getSupportedGateways(),
-            array_keys(GatewayInfo::getSupportedGateways())
+            $gateways,
+            array_keys($gateways)
         );
     }
 
