@@ -759,6 +759,7 @@ class Order extends DataObject
 
     /**
      * Create a unique reference identifier string for this order.
+     * Uses the order ID (available after write) — no loop, no collision check needed.
      */
     public function generateReference(): void
     {
@@ -766,15 +767,7 @@ class Order extends DataObject
 
         $this->extend('generateReference', $reference);
 
-        $candidate = $reference;
-        //prevent generating references that are the same
-        $count = 0;
-        while (Order::get()->filter(['Reference' => $candidate])->count() > 0) {
-            ++$count;
-            $candidate = $reference . '' . $count;
-        }
-
-        $this->Reference = $candidate;
+        $this->Reference = $reference;
     }
 
     /**
@@ -791,9 +784,6 @@ class Order extends DataObject
     protected function onBeforeWrite(): void
     {
         parent::onBeforeWrite();
-        if (!$this->getField('Reference') && in_array($this->Status, static::config()->get('placed_status'))) {
-            $this->generateReference();
-        }
 
         // perform status transition
         if ($this->isInDB() && $this->isChanged('Status')) {
@@ -858,6 +848,16 @@ class Order extends DataObject
     protected function onAfterWrite(): void
     {
         parent::onAfterWrite();
+
+        // Generate reference from ID if not already set (moved from onBeforeWrite to avoid O(n²) loop)
+        if (!$this->getField('Reference') && in_array($this->Status, static::config()->get('placed_status'))) {
+            $this->generateReference();
+            DB::query(sprintf(
+                "UPDATE \"SilverShop_Order\" SET \"Reference\" = '%s' WHERE \"ID\" = %d",
+                addslashes($this->Reference),
+                $this->ID
+            ));
+        }
 
         //create an OrderStatusLog
         if ($this->flagOrderStatusWrite) {
